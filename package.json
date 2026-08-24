@@ -1,0 +1,13 @@
+{
+  "name": "calendrier-saison",
+  "private": true,
+  "description": "Planificateur et calendrier de saison football",
+  "scripts": {
+    "dev": "concurrently -n api,ui -c green,cyan \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm run build --prefix client",
+    "start": "npm run start --prefix server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}
