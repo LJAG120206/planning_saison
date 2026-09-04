@@ -4,15 +4,24 @@ type Props = {
   sunday: Sunday;
   eventTypes: Record<Exclude<EventType, "officiel">, string>;
   venueTypes: Record<VenueType, string>;
+  calendarEdit: boolean;
   onPlan: () => void;
+  onAdjust: () => void;
 };
 
-export default function SundayTile({ sunday, eventTypes, venueTypes, onPlan }: Props) {
+export default function SundayTile({
+  sunday,
+  eventTypes,
+  venueTypes,
+  calendarEdit,
+  onPlan,
+  onAdjust,
+}: Props) {
   const status = sunday.official ? "official" : sunday.event ? "planned" : "available";
   const officialDetails = sunday.official ? sunday.event : null;
 
   return (
-    <article className={`tile ${status}`}>
+    <article className={`tile ${status}${calendarEdit ? " calendar-edit" : ""}${sunday.overridden ? " overridden" : ""}`}>
       <p className="tile-kicker">{sunday.weekday}</p>
       <div className="tile-date">
         <strong>{sunday.day}</strong>
@@ -22,6 +31,7 @@ export default function SundayTile({ sunday, eventTypes, venueTypes, onPlan }: P
       </div>
 
       <div className="tile-body">
+        {sunday.overridden ? <span className="override-badge">Calendrier ajusté</span> : null}
         {sunday.official ? (
           <>
             <span className="league-badge">{sunday.leagueLabel}</span>
@@ -65,17 +75,19 @@ export default function SundayTile({ sunday, eventTypes, venueTypes, onPlan }: P
       </div>
 
       <button
-        className={sunday.event ? "edit-btn" : "add-btn"}
-        onClick={onPlan}
+        className={calendarEdit ? "adjust-btn" : sunday.event ? "edit-btn" : "add-btn"}
+        onClick={calendarEdit ? onAdjust : onPlan}
         type="button"
       >
-        {sunday.official
-          ? sunday.event
-            ? "Modifier le match"
-            : "Renseigner l'adversaire"
-          : sunday.event
-            ? "Modifier l'action"
-            : "Ajouter une action"}
+        {calendarEdit
+          ? "Ajuster cette date"
+          : sunday.official
+            ? sunday.event
+              ? "Modifier le match"
+              : "Renseigner l'adversaire"
+            : sunday.event
+              ? "Modifier l'action"
+              : "Ajouter une action"}
       </button>
     </article>
   );

@@ -1,4 +1,4 @@
-import type { EventPayload, MetaResponse, SeasonResponse } from "./types";
+import type { CalendarOverridePayload, EventPayload, MetaResponse, SeasonResponse } from "./types";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -40,4 +40,18 @@ export function deleteEvent(id: number) {
   return request<{ ok: boolean }>(`/api/events/${id}`, {
     method: "DELETE",
   });
+}
+
+export function saveCalendarOverride(payload: CalendarOverridePayload) {
+  return request<{ ok: boolean; overridden: boolean }>("/api/calendar/overrides", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function resetCategoryCalendar(categoryId: string) {
+  return request<{ ok: boolean }>(
+    `/api/calendar/overrides?category=${encodeURIComponent(categoryId)}`,
+    { method: "DELETE" },
+  );
 }

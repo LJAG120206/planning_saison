@@ -54,6 +54,51 @@ export function isChampionshipCode(code) {
   return /J\d+/.test(code);
 }
 
+export function normalizeLeagueCode(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  if (/^\d{1,2}$/.test(value)) return `J${Number(value)}`;
+  const match = value.match(/^j\s*(\d{1,2})$/i);
+  if (match) return `J${Number(match[1])}`;
+  return value;
+}
+
+export function suggestLeagueCode(codes) {
+  const used = new Set();
+  for (const code of codes) {
+    const match = String(code || "").match(/J(\d+)/);
+    if (match) used.add(Number(match[1]));
+  }
+  let next = 1;
+  while (used.has(next)) next += 1;
+  return `J${next}`;
+}
+
+export function resolveLeagueState(baseCode, override) {
+  if (!override) {
+    return {
+      code: baseCode,
+      official: isChampionshipCode(baseCode),
+      overridden: false,
+    };
+  }
+
+  if (override.mode === "free") {
+    return {
+      code: null,
+      official: false,
+      overridden: isChampionshipCode(baseCode),
+    };
+  }
+
+  const code = override.league_code || baseCode;
+  return {
+    code,
+    official: true,
+    overridden: code !== baseCode || !isChampionshipCode(baseCode),
+  };
+}
+
 export function championshipLabel(code) {
   if (code === "JA") return "Championnat — Journée d'accueil";
   if (code === "TP") return "Championnat — Tournoi de promotion";
@@ -86,9 +131,10 @@ export function availabilityContext(code, isoDate) {
   return parts.join(" · ");
 }
 
-export function buildSunday(isoDate, code, event) {
+export function buildSunday(isoDate, code, event, options = {}) {
   const date = parseIsoDate(isoDate);
-  const official = isChampionshipCode(code);
+  const official = options.official ?? isChampionshipCode(code);
+  const baseCode = options.baseCode ?? code;
 
   return {
     date: isoDate,
@@ -104,8 +150,12 @@ export function buildSunday(isoDate, code, event) {
     official,
     blocked: official,
     leagueLabel: official ? championshipLabel(code) : null,
-    leagueCode: code,
-    context: official ? null : availabilityContext(code, isoDate),
+    leagueCode: official ? code : null,
+    context: official ? null : availabilityContext(baseCode, isoDate),
+    overridden: Boolean(options.overridden),
+    defaultOfficial: isChampionshipCode(baseCode),
+    defaultLeagueCode: baseCode,
+    defaultLeagueLabel: isChampionshipCode(baseCode) ? championshipLabel(baseCode) : null,
     event: event
       ? {
           id: event.id,

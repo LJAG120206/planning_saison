@@ -32,6 +32,10 @@ export type Sunday = {
   leagueCode: string | null;
   context: string | null;
   event: PlannedEvent | null;
+  overridden: boolean;
+  defaultOfficial: boolean;
+  defaultLeagueCode: string | null;
+  defaultLeagueLabel: string | null;
 };
 
 export type MonthGroup = {
@@ -45,12 +49,14 @@ export type SeasonStats = {
   freeSlots: number;
   friendlies: number;
   tournaments: number;
+  overriddenDays: number;
 };
 
 export type SeasonResponse = {
   category: Category;
   filter: FilterId;
   stats: SeasonStats;
+  suggestedLeagueCode: string;
   sundays: Sunday[];
   months: MonthGroup[];
 };
@@ -73,4 +79,12 @@ export type EventPayload = {
   venueDetail: string;
   time: string;
   notes: string;
+};
+
+export type CalendarOverridePayload = {
+  categoryId: string;
+  sundayDate: string;
+  mode: "official" | "free" | "reset";
+  leagueCode?: string;
+  clearConflictingEvent?: boolean;
 };

@@ -12,11 +12,11 @@ import {
   getCategory,
 } from "./categories.js";
 import * as db from "./db.js";
-import { buildSunday, isChampionshipCode } from "./season.js";
+import { buildSunday, isChampionshipCode, normalizeLeagueCode, resolveLeagueState, suggestLeagueCode } from "./season.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT_DIST = path.resolve(__dirname, "..", "..", "client", "dist");
-const PORT = Number(process.env.PORT) || 8787;
+const PORT = Number(process.env.API_PORT || process.env.PORT) || 47128;
 
 const app = express();
 app.use(cors());
@@ -48,17 +48,15 @@ app.get("/api/season", (req, res) => {
 
   db.setSetting("last_category", categoryId);
 
-  const events = db.listEvents(categoryId);
-  const eventsByDate = new Map(events.map((event) => [event.sunday_date, event]));
-  const sundays = db.listCalendarDays().map((day) =>
-    buildSunday(day.date, day.competitions[categoryId] ?? null, eventsByDate.get(day.date) ?? null),
-  );
+  const sundays = buildSeasonSundays(categoryId);
+  const overrideCount = sundays.filter((sunday) => sunday.overridden).length;
 
   const stats = {
     officialMatchdays: sundays.filter((sunday) => sunday.official).length,
     freeSlots: sundays.filter((sunday) => !sunday.official && !sunday.event).length,
     friendlies: sundays.filter((sunday) => sunday.event?.type === "amical").length,
     tournaments: sundays.filter((sunday) => sunday.event?.type === "tournoi").length,
+    overriddenDays: overrideCount,
   };
 
   const visible = sundays.filter((sunday) => {
@@ -73,9 +71,58 @@ app.get("/api/season", (req, res) => {
     category,
     filter,
     stats,
+    suggestedLeagueCode: suggestLeagueCode(sundays.filter((sunday) => sunday.official).map((sunday) => sunday.leagueCode)),
     sundays: visible,
     months: groupByMonth(visible),
   });
+});
+
+app.put("/api/calendar/overrides", (req, res) => {
+  const categoryId = String(req.body?.categoryId || "");
+  const sundayDate = String(req.body?.sundayDate || "");
+  const mode = String(req.body?.mode || "");
+  const clearConflictingEvent = Boolean(req.body?.clearConflictingEvent);
+
+  if (!getCategory(categoryId)) {
+    return res.status(400).json({ error: "Catégorie inconnue." });
+  }
+  if (!db.getCalendarDay(sundayDate)) {
+    return res.status(400).json({ error: "Date absente du calendrier de saison." });
+  }
+  if (!["official", "free", "reset"].includes(mode)) {
+    return res.status(400).json({ error: "Indiquez si la date est officielle, libre, ou à rétablir." });
+  }
+
+  const applied = applyCalendarOverride({
+    categoryId,
+    sundayDate,
+    mode,
+    leagueCode: req.body?.leagueCode,
+    clearConflictingEvent,
+  });
+  if (applied.error) {
+    return res.status(applied.status).json({
+      error: applied.error,
+      conflict: applied.conflict ?? false,
+    });
+  }
+
+  res.json({ ok: true, overridden: applied.overridden });
+});
+
+app.delete("/api/calendar/overrides", (req, res) => {
+  const categoryId = String(req.query.category || "");
+  if (!getCategory(categoryId)) {
+    return res.status(400).json({ error: "Catégorie inconnue." });
+  }
+
+  const overrides = db.listOverrides(categoryId);
+  db.deleteOverridesForCategory(categoryId);
+  for (const override of overrides) {
+    syncEventWithDay(categoryId, override.sunday_date);
+  }
+
+  res.json({ ok: true });
 });
 
 app.post("/api/events", (req, res) => {
@@ -151,6 +198,22 @@ app.listen(PORT, () => {
   console.log(`Calendrier de saison prêt sur http://127.0.0.1:${PORT}`);
 });
 
+function buildSeasonSundays(categoryId) {
+  const events = db.listEvents(categoryId);
+  const eventsByDate = new Map(events.map((event) => [event.sunday_date, event]));
+  const overrides = new Map(db.listOverrides(categoryId).map((row) => [row.sunday_date, row]));
+
+  return db.listCalendarDays().map((day) => {
+    const baseCode = day.competitions[categoryId] ?? null;
+    const resolved = resolveLeagueState(baseCode, overrides.get(day.date) ?? null);
+    return buildSunday(day.date, resolved.code, eventsByDate.get(day.date) ?? null, {
+      official: resolved.official,
+      overridden: resolved.overridden,
+      baseCode,
+    });
+  });
+}
+
 function groupByMonth(sundays) {
   const months = [];
   for (const sunday of sundays) {
@@ -173,8 +236,79 @@ function capitalize(value) {
 }
 
 function isOfficialDay(categoryId, sundayDate) {
-  const day = db.listCalendarDays().find((item) => item.date === sundayDate);
-  return isChampionshipCode(day?.competitions[categoryId] ?? null);
+  const day = db.getCalendarDay(sundayDate);
+  if (!day) return false;
+  const baseCode = day.competitions[categoryId] ?? null;
+  return resolveLeagueState(baseCode, db.getOverride(categoryId, sundayDate)).official;
+}
+
+function applyCalendarOverride({ categoryId, sundayDate, mode, leagueCode, clearConflictingEvent }) {
+  const day = db.getCalendarDay(sundayDate);
+  const baseCode = day.competitions[categoryId] ?? null;
+  const defaultOfficial = isChampionshipCode(baseCode);
+
+  if (mode === "reset") {
+    db.deleteOverride(categoryId, sundayDate);
+    syncEventWithDay(categoryId, sundayDate);
+    return { overridden: false };
+  }
+
+  let nextMode = mode;
+  let nextCode = "";
+
+  if (mode === "official") {
+    nextCode = normalizeLeagueCode(leagueCode);
+    if (!isChampionshipCode(nextCode)) {
+      return {
+        status: 400,
+        error: "Indiquez un code de journée officiel (ex. J5, JA, TP).",
+      };
+    }
+  }
+
+  const matchesDefault =
+    (mode === "free" && !defaultOfficial) ||
+    (mode === "official" && defaultOfficial && nextCode === baseCode);
+
+  if (matchesDefault) {
+    db.deleteOverride(categoryId, sundayDate);
+    syncEventWithDay(categoryId, sundayDate);
+    return { overridden: false };
+  }
+
+  const nextOfficial = nextMode === "official";
+  const existing = db.getEventByDay(categoryId, sundayDate);
+  const conflict =
+    existing &&
+    ((nextOfficial && existing.event_type !== OFFICIAL_EVENT_TYPE) ||
+      (!nextOfficial && existing.event_type === OFFICIAL_EVENT_TYPE));
+
+  if (conflict && !clearConflictingEvent) {
+    return {
+      status: 409,
+      conflict: true,
+      error: nextOfficial
+        ? "Une action coach est déjà planifiée sur cette date. Confirmez pour la supprimer et marquer la journée officielle."
+        : "Les infos du match officiel seront effacées si vous libérez cette date.",
+    };
+  }
+
+  db.upsertOverride({
+    categoryId,
+    sundayDate,
+    mode: nextMode,
+    leagueCode: nextCode,
+  });
+  syncEventWithDay(categoryId, sundayDate);
+  return { overridden: true };
+}
+
+function syncEventWithDay(categoryId, sundayDate) {
+  const official = isOfficialDay(categoryId, sundayDate);
+  const event = db.getEventByDay(categoryId, sundayDate);
+  if (!event) return;
+  if (official && event.event_type !== OFFICIAL_EVENT_TYPE) db.deleteEvent(event.id);
+  if (!official && event.event_type === OFFICIAL_EVENT_TYPE) db.deleteEvent(event.id);
 }
 
 function parseEventPayload(body = {}) {

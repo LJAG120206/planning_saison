@@ -50,6 +50,13 @@ export async function initDb() {
       notes TEXT NOT NULL DEFAULT '',
       UNIQUE(category_id, sunday_date)
     );
+    CREATE TABLE IF NOT EXISTS calendar_overrides (
+      category_id TEXT NOT NULL,
+      sunday_date TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      league_code TEXT NOT NULL DEFAULT '',
+      PRIMARY KEY (category_id, sunday_date)
+    );
   `);
 
   seedCalendar();
@@ -118,6 +125,63 @@ export function listCalendarDays() {
     date: row.sunday_date,
     competitions: JSON.parse(row.competitions_json),
   }));
+}
+
+export function getCalendarDay(sundayDate) {
+  const row = queryOne(
+    "SELECT sunday_date, competitions_json FROM calendar_days WHERE sunday_date = ?",
+    [sundayDate],
+  );
+  if (!row) return null;
+  return {
+    date: row.sunday_date,
+    competitions: JSON.parse(row.competitions_json),
+  };
+}
+
+export function listOverrides(categoryId) {
+  return query(
+    `SELECT category_id, sunday_date, mode, league_code
+     FROM calendar_overrides WHERE category_id = ? ORDER BY sunday_date ASC`,
+    [categoryId],
+  );
+}
+
+export function getOverride(categoryId, sundayDate) {
+  return queryOne(
+    `SELECT category_id, sunday_date, mode, league_code
+     FROM calendar_overrides WHERE category_id = ? AND sunday_date = ?`,
+    [categoryId, sundayDate],
+  );
+}
+
+export function upsertOverride(payload) {
+  run(
+    `INSERT INTO calendar_overrides (category_id, sunday_date, mode, league_code)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(category_id, sunday_date)
+     DO UPDATE SET mode = excluded.mode, league_code = excluded.league_code`,
+    [payload.categoryId, payload.sundayDate, payload.mode, payload.leagueCode ?? ""],
+  );
+}
+
+export function deleteOverride(categoryId, sundayDate) {
+  run(
+    "DELETE FROM calendar_overrides WHERE category_id = ? AND sunday_date = ?",
+    [categoryId, sundayDate],
+  );
+}
+
+export function deleteOverridesForCategory(categoryId) {
+  run("DELETE FROM calendar_overrides WHERE category_id = ?", [categoryId]);
+}
+
+export function getEventByDay(categoryId, sundayDate) {
+  return queryOne(
+    `SELECT id, category_id, sunday_date, event_type, title, venue_type, venue_detail, time, notes
+     FROM events WHERE category_id = ? AND sunday_date = ?`,
+    [categoryId, sundayDate],
+  );
 }
 
 export function listEvents(categoryId) {

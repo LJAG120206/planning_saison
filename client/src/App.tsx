@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { createEvent, deleteEvent, fetchMeta, fetchSeason, updateEvent } from "./api";
+import { createEvent, deleteEvent, fetchMeta, fetchSeason, resetCategoryCalendar, saveCalendarOverride, updateEvent } from "./api";
+import CalendarAdjustModal from "./components/CalendarAdjustModal";
 import EventModal from "./components/EventModal";
 import SundayTile from "./components/SundayTile";
 import type {
@@ -27,6 +28,8 @@ export default function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Sunday | null>(null);
+  const [calendarEdit, setCalendarEdit] = useState(false);
+  const [adjusting, setAdjusting] = useState<Sunday | null>(null);
 
   useEffect(() => {
     fetchMeta()
@@ -67,6 +70,51 @@ export default function App() {
     const data = await fetchSeason(categoryId, filter);
     setSeason(data);
     setSelected(null);
+  }
+
+  async function reloadSeason() {
+    const data = await fetchSeason(categoryId, calendarEdit ? "all" : filter);
+    setSeason(data);
+  }
+
+  async function handleOverride(
+    mode: "official" | "free" | "reset",
+    leagueCode: string,
+    clearConflictingEvent: boolean,
+  ) {
+    if (!adjusting) return;
+    await saveCalendarOverride({
+      categoryId,
+      sundayDate: adjusting.date,
+      mode,
+      leagueCode,
+      clearConflictingEvent,
+    });
+    await reloadSeason();
+    setAdjusting(null);
+  }
+
+  async function handleResetCalendar() {
+    if (!categoryId) return;
+    if (
+      !window.confirm(
+        "Rétablir toutes les dates de championnat du calendrier officiel pour cette catégorie ?",
+      )
+    ) {
+      return;
+    }
+    await resetCategoryCalendar(categoryId);
+    await reloadSeason();
+  }
+
+  function toggleCalendarEdit() {
+    setCalendarEdit((current) => {
+      const next = !current;
+      if (next) setFilter("all");
+      return next;
+    });
+    setSelected(null);
+    setAdjusting(null);
   }
 
   return (
@@ -124,17 +172,43 @@ export default function App() {
             {FILTERS.map((item) => (
               <button
                 key={item.id}
-                className={`filter-btn${filter === item.id ? " active" : ""}`}
-                onClick={() => setFilter(item.id)}
+                className={`filter-btn${filter === item.id && !calendarEdit ? " active" : ""}`}
+                onClick={() => {
+                  setCalendarEdit(false);
+                  setFilter(item.id);
+                }}
                 type="button"
               >
                 {item.label}
               </button>
             ))}
+            <button
+              className={`filter-btn calendar-toggle${calendarEdit ? " active" : ""}`}
+              onClick={toggleCalendarEdit}
+              type="button"
+            >
+              Ajuster le championnat
+            </button>
           </div>
         </div>
 
         {error ? <p className="error-banner">{error}</p> : null}
+        {calendarEdit ? (
+          <div className="calendar-banner">
+            <p>
+              Cliquez une date pour la marquer en journée officielle ou la libérer.
+              Les changements ne s'appliquent qu'à <strong>{season?.category.label}</strong>.
+              {season?.stats.overriddenDays
+                ? ` ${season.stats.overriddenDays} date${season.stats.overriddenDays > 1 ? "s" : ""} déjà ajustée${season.stats.overriddenDays > 1 ? "s" : ""}.`
+                : ""}
+            </p>
+            {season?.stats.overriddenDays ? (
+              <button className="ghost" onClick={() => void handleResetCalendar()} type="button">
+                Rétablir le calendrier officiel
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {loading && !season ? <p className="loading">Chargement du calendrier…</p> : null}
 
         {season?.months.length ? (
@@ -148,7 +222,9 @@ export default function App() {
                     sunday={sunday}
                     eventTypes={meta?.eventTypes ?? ({} as Record<Exclude<EventType, "officiel">, string>)}
                     venueTypes={meta?.venueTypes ?? ({} as Record<VenueType, string>)}
+                    calendarEdit={calendarEdit}
                     onPlan={() => setSelected(sunday)}
+                    onAdjust={() => setAdjusting(sunday)}
                   />
                 ))}
               </div>
@@ -158,6 +234,15 @@ export default function App() {
           <p className="empty-state">Aucun dimanche ne correspond à ce filtre.</p>
         ) : null}
       </section>
+
+      {adjusting && season ? (
+        <CalendarAdjustModal
+          sunday={adjusting}
+          suggestedLeagueCode={season.suggestedLeagueCode}
+          onClose={() => setAdjusting(null)}
+          onSave={handleOverride}
+        />
+      ) : null}
 
       {selected && meta ? (
         <EventModal

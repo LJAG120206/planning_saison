@@ -135,18 +135,25 @@ export default function EventModal({
             />
           </label>
 
-          <fieldset className="field" style={{ border: 0, margin: 0, padding: 0 }}>
+          <fieldset className="venue-field">
             <legend className="field-label">Lieu</legend>
-            <div className={`venue-row${official ? " two" : ""}`}>
+            <div className={`venue-row${official ? " two" : ""}`} role="radiogroup" aria-label="Lieu">
               {(Object.entries(venues) as [VenueType, string][]).map(([id, label]) => (
-                <label key={id}>
+                <label className="venue-choice" key={id}>
                   <input
                     type="radio"
                     name="venue"
+                    value={id}
                     checked={venueType === id}
                     onChange={() => setVenueType(id)}
                   />
-                  {label}
+                  <span className="venue-card">
+                    <span className="venue-icon-wrap">
+                      <VenueIcon type={id} />
+                    </span>
+                    <strong>{label}</strong>
+                    <span className="venue-hint">{VENUE_HINTS[id]}</span>
+                  </span>
                 </label>
               ))}
             </div>
@@ -197,5 +204,39 @@ export default function EventModal({
         </div>
       </form>
     </div>
+  );
+}
+
+const VENUE_HINTS: Record<VenueType, string> = {
+  domicile: "Chez nous",
+  exterieur: "Chez l'adversaire",
+  neutre: "Terrain neutre",
+};
+
+function VenueIcon({ type }: { type: VenueType }) {
+  if (type === "domicile") {
+    return (
+      <svg className="venue-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 11.2 12 4l8 7.2" />
+        <path d="M6.4 10.5V20h4.1v-5.6h3V20h4.1v-9.5" />
+      </svg>
+    );
+  }
+
+  if (type === "exterieur") {
+    return (
+      <svg className="venue-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 12h12.4" />
+        <path d="M12.2 7.2 17.6 12l-5.4 4.8" />
+        <path d="M19.4 5.4v13.2" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className="venue-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 21s6.4-6 6.4-11A6.4 6.4 0 0 0 12 3.6 6.4 6.4 0 0 0 5.6 10c0 5 6.4 11 6.4 11z" />
+      <circle cx="12" cy="9.8" r="2.1" />
+    </svg>
   );
 }
