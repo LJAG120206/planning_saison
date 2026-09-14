@@ -167,6 +167,14 @@ export default function App() {
               <span className="stat-label">Tournois calés</span>
               <strong>{season?.stats.tournaments ?? "–"}</strong>
             </article>
+            <article className="stat bilan">
+              <span className="stat-label">Bilan saisi</span>
+              <strong>
+                {season && season.stats.wins + season.stats.draws + season.stats.losses > 0
+                  ? `${season.stats.wins}V · ${season.stats.draws}N · ${season.stats.losses}D`
+                  : "–"}
+              </strong>
+            </article>
           </div>
           <div className="filters" role="tablist" aria-label="Filtres d'affichage">
             {FILTERS.map((item) => (

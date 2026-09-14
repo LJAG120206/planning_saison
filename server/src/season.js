@@ -156,21 +156,55 @@ export function buildSunday(isoDate, code, event, options = {}) {
     defaultOfficial: isChampionshipCode(baseCode),
     defaultLeagueCode: baseCode,
     defaultLeagueLabel: isChampionshipCode(baseCode) ? championshipLabel(baseCode) : null,
-    event: event
-      ? {
-          id: event.id,
-          type: event.event_type,
-          title: event.title,
-          venueType: event.venue_type,
-          venueDetail: event.venue_detail,
-          time: event.time,
-          notes: event.notes,
-        }
-      : null,
+    event: mapPlannedEvent(event),
   };
 }
 
 function parseIsoDate(isoDate) {
   const [year, month, day] = isoDate.split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+export function mapPlannedEvent(event) {
+  if (!event) return null;
+  return {
+    id: event.id,
+    type: event.event_type,
+    title: event.title,
+    venueType: event.venue_type,
+    venueDetail: event.venue_detail,
+    time: event.time,
+    notes: event.notes,
+    scoreFor: event.score_for == null || event.score_for === "" ? null : Number(event.score_for),
+    scoreAgainst:
+      event.score_against == null || event.score_against === "" ? null : Number(event.score_against),
+    manOfTheMatch: event.man_of_the_match || "",
+    scorers: parsePlayerEntries(event.scorers_json),
+    assists: parsePlayerEntries(event.assists_json),
+  };
+}
+
+export function parsePlayerEntries(raw) {
+  try {
+    const list = typeof raw === "string" ? JSON.parse(raw || "[]") : raw;
+    if (!Array.isArray(list)) return [];
+    const merged = new Map();
+    for (const item of list) {
+      const name = String(item?.name || "").trim();
+      if (!name) continue;
+      const count = Math.max(1, Math.min(99, Number(item.count) || 1));
+      const key = name.toLocaleLowerCase("fr-FR");
+      merged.set(key, { name, count: (merged.get(key)?.count ?? 0) + count });
+    }
+    return [...merged.values()];
+  } catch {
+    return [];
+  }
+}
+
+export function parseOptionalScore(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const score = Number(value);
+  if (!Number.isInteger(score) || score < 0 || score > 99) return undefined;
+  return score;
 }

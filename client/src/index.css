@@ -159,7 +159,7 @@ button {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  grid-template-columns: repeat(5, minmax(110px, 1fr));
   gap: 12px;
   flex: 1;
 }
@@ -183,6 +183,10 @@ button {
   font-family: "Barlow Condensed", sans-serif;
   font-size: 2rem;
   line-height: 1;
+}
+
+.stat.bilan strong {
+  font-size: 1.45rem;
 }
 
 .filters {
@@ -400,7 +404,7 @@ button {
 }
 
 .modal {
-  width: min(560px, 100%);
+  width: min(620px, 100%);
   max-height: min(92vh, 820px);
   overflow: auto;
   padding: 24px;
@@ -678,6 +682,116 @@ button {
   margin-top: 6px;
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.match-sheet {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--bg-soft);
+}
+
+.match-sheet h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.match-sheet .field-help {
+  margin-top: 4px;
+}
+
+.score-box {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px;
+  align-items: end;
+}
+
+.score-box input {
+  text-align: center;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 1.8rem;
+  font-weight: 800;
+}
+
+.score-sep {
+  padding-bottom: 10px;
+  color: var(--muted);
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 1.8rem;
+  font-weight: 800;
+}
+
+.player-rows {
+  display: grid;
+  gap: 8px;
+}
+
+.player-row {
+  display: grid;
+  grid-template-columns: 1fr 72px 40px;
+  gap: 8px;
+}
+
+.player-row input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.player-row input[type="number"] {
+  text-align: center;
+}
+
+.row-remove {
+  border: 0;
+  border-radius: 12px;
+  background: #f3e8e6;
+  color: var(--danger);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.link-btn {
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pitch);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.match-score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.match-score span {
+  color: var(--muted);
+}
+
+.tile.official .match-score,
+.tile.official .match-score span {
+  color: #fffdf8;
+}
+
+.tile.official .match-score.win {
+  color: #d7f5de;
+}
+
+.tile.official .match-score.loss {
+  color: #ffd0c8;
 }
 
 .form-error {

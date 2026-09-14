@@ -48,6 +48,11 @@ export async function initDb() {
       venue_detail TEXT NOT NULL DEFAULT '',
       time TEXT NOT NULL DEFAULT '',
       notes TEXT NOT NULL DEFAULT '',
+      score_for INTEGER,
+      score_against INTEGER,
+      man_of_the_match TEXT NOT NULL DEFAULT '',
+      scorers_json TEXT NOT NULL DEFAULT '[]',
+      assists_json TEXT NOT NULL DEFAULT '[]',
       UNIQUE(category_id, sunday_date)
     );
     CREATE TABLE IF NOT EXISTS calendar_overrides (
@@ -60,11 +65,30 @@ export async function initDb() {
   `);
 
   seedCalendar();
+  ensureEventMatchColumns();
   if (!getSetting("last_category")) {
     setSetting("last_category", DEFAULT_CATEGORY);
   }
   save();
   return db;
+}
+
+const EVENT_COLUMNS = `id, category_id, sunday_date, event_type, title, venue_type, venue_detail, time, notes, score_for, score_against, man_of_the_match, scorers_json, assists_json`;
+
+function ensureEventMatchColumns() {
+  const columns = new Set(query("PRAGMA table_info(events)").map((column) => column.name));
+  const additions = [
+    ["score_for", "INTEGER"],
+    ["score_against", "INTEGER"],
+    ["man_of_the_match", "TEXT NOT NULL DEFAULT ''"],
+    ["scorers_json", "TEXT NOT NULL DEFAULT '[]'"],
+    ["assists_json", "TEXT NOT NULL DEFAULT '[]'"],
+  ];
+  for (const [name, definition] of additions) {
+    if (!columns.has(name)) {
+      db.run(`ALTER TABLE events ADD COLUMN ${name} ${definition}`);
+    }
+  }
 }
 
 function seedCalendar() {
@@ -178,7 +202,7 @@ export function deleteOverridesForCategory(categoryId) {
 
 export function getEventByDay(categoryId, sundayDate) {
   return queryOne(
-    `SELECT id, category_id, sunday_date, event_type, title, venue_type, venue_detail, time, notes
+    `SELECT ${EVENT_COLUMNS}
      FROM events WHERE category_id = ? AND sunday_date = ?`,
     [categoryId, sundayDate],
   );
@@ -186,7 +210,7 @@ export function getEventByDay(categoryId, sundayDate) {
 
 export function listEvents(categoryId) {
   return query(
-    `SELECT id, category_id, sunday_date, event_type, title, venue_type, venue_detail, time, notes
+    `SELECT ${EVENT_COLUMNS}
      FROM events WHERE category_id = ? ORDER BY sunday_date ASC`,
     [categoryId],
   );
@@ -194,8 +218,7 @@ export function listEvents(categoryId) {
 
 export function getEventById(id) {
   return queryOne(
-    `SELECT id, category_id, sunday_date, event_type, title, venue_type, venue_detail, time, notes
-     FROM events WHERE id = ?`,
+    `SELECT ${EVENT_COLUMNS} FROM events WHERE id = ?`,
     [id],
   );
 }
@@ -209,18 +232,11 @@ export function getEventForDay(categoryId, sundayDate) {
 
 export function insertEvent(payload) {
   run(
-    `INSERT INTO events (category_id, sunday_date, event_type, title, venue_type, venue_detail, time, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      payload.categoryId,
-      payload.sundayDate,
-      payload.eventType,
-      payload.title,
-      payload.venueType,
-      payload.venueDetail,
-      payload.time,
-      payload.notes,
-    ],
+    `INSERT INTO events (
+       category_id, sunday_date, event_type, title, venue_type, venue_detail, time, notes,
+       score_for, score_against, man_of_the_match, scorers_json, assists_json
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    eventValues(payload),
   );
   return getEventForDay(payload.categoryId, payload.sundayDate);
 }
@@ -228,7 +244,8 @@ export function insertEvent(payload) {
 export function updateEvent(id, payload) {
   run(
     `UPDATE events
-     SET event_type = ?, title = ?, venue_type = ?, venue_detail = ?, time = ?, notes = ?
+     SET event_type = ?, title = ?, venue_type = ?, venue_detail = ?, time = ?, notes = ?,
+         score_for = ?, score_against = ?, man_of_the_match = ?, scorers_json = ?, assists_json = ?
      WHERE id = ?`,
     [
       payload.eventType,
@@ -237,9 +254,32 @@ export function updateEvent(id, payload) {
       payload.venueDetail,
       payload.time,
       payload.notes,
+      payload.scoreFor,
+      payload.scoreAgainst,
+      payload.manOfTheMatch,
+      JSON.stringify(payload.scorers),
+      JSON.stringify(payload.assists),
       id,
     ],
   );
+}
+
+function eventValues(payload) {
+  return [
+    payload.categoryId,
+    payload.sundayDate,
+    payload.eventType,
+    payload.title,
+    payload.venueType,
+    payload.venueDetail,
+    payload.time,
+    payload.notes,
+    payload.scoreFor,
+    payload.scoreAgainst,
+    payload.manOfTheMatch,
+    JSON.stringify(payload.scorers),
+    JSON.stringify(payload.assists),
+  ];
 }
 
 export function deleteEvent(id) {

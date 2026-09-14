@@ -1,5 +1,6 @@
-import { FormEvent, useEffect, useState } from "react";
-import type { EventPayload, EventType, Sunday, VenueType } from "../types";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { emptyPlayerRow, filledPlayerRows, isMatchEventType } from "../match";
+import type { EventPayload, EventType, PlayerContribution, Sunday, VenueType } from "../types";
 
 type CoachEventType = Exclude<EventType, "officiel">;
 
@@ -36,8 +37,23 @@ export default function EventModal({
   const [venueDetail, setVenueDetail] = useState(existing?.venueDetail ?? "");
   const [time, setTime] = useState(existing?.time ?? "");
   const [notes, setNotes] = useState(existing?.notes ?? "");
+  const [scoreFor, setScoreFor] = useState(
+    existing?.scoreFor != null ? String(existing.scoreFor) : "",
+  );
+  const [scoreAgainst, setScoreAgainst] = useState(
+    existing?.scoreAgainst != null ? String(existing.scoreAgainst) : "",
+  );
+  const [scorers, setScorers] = useState<PlayerContribution[]>(filledPlayerRows(existing?.scorers));
+  const [assists, setAssists] = useState<PlayerContribution[]>(filledPlayerRows(existing?.assists));
+  const [manOfTheMatch, setManOfTheMatch] = useState(existing?.manOfTheMatch ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const showMatchSheet = official || isMatchEventType(eventType);
+  const motmSuggestions = useMemo(() => {
+    const names = [...scorers, ...assists].map((item) => item.name.trim()).filter(Boolean);
+    return [...new Set(names)];
+  }, [scorers, assists]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -61,6 +77,11 @@ export default function EventModal({
         venueDetail,
         time,
         notes,
+        scoreFor: showMatchSheet && scoreFor !== "" ? Number(scoreFor) : null,
+        scoreAgainst: showMatchSheet && scoreAgainst !== "" ? Number(scoreAgainst) : null,
+        scorers: showMatchSheet ? scorers : [],
+        assists: showMatchSheet ? assists : [],
+        manOfTheMatch: showMatchSheet ? manOfTheMatch : "",
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Enregistrement impossible.");
@@ -72,7 +93,7 @@ export default function EventModal({
   async function handleDelete() {
     if (!existing) return;
     const message = official
-      ? "Effacer l'adversaire et le lieu de cette journée officielle ?"
+      ? "Effacer l'adversaire, le lieu et le résultat de cette journée officielle ?"
       : "Supprimer cet événement et libérer le créneau ?";
     if (!window.confirm(message)) return;
     setBusy(true);
@@ -177,6 +198,73 @@ export default function EventModal({
             />
           </label>
 
+          {showMatchSheet ? (
+            <section className="match-sheet">
+              <div>
+                <h3>Feuille de match</h3>
+                <p className="field-help">Optionnel, à remplir après le week-end.</p>
+              </div>
+
+              <div className="score-box">
+                <label className="field">
+                  <span className="field-label">Nous</span>
+                  <input
+                    inputMode="numeric"
+                    min="0"
+                    max="99"
+                    onChange={(event) => setScoreFor(event.target.value)}
+                    placeholder="–"
+                    type="number"
+                    value={scoreFor}
+                  />
+                </label>
+                <span className="score-sep" aria-hidden="true">
+                  –
+                </span>
+                <label className="field">
+                  <span className="field-label">Adversaire</span>
+                  <input
+                    inputMode="numeric"
+                    min="0"
+                    max="99"
+                    onChange={(event) => setScoreAgainst(event.target.value)}
+                    placeholder="–"
+                    type="number"
+                    value={scoreAgainst}
+                  />
+                </label>
+              </div>
+
+              <PlayerEntryList
+                label="Buteurs"
+                onChange={setScorers}
+                placeholder="Nom du buteur"
+                rows={scorers}
+              />
+              <PlayerEntryList
+                label="Passeurs décisifs"
+                onChange={setAssists}
+                placeholder="Nom du passeur"
+                rows={assists}
+              />
+
+              <label className="field">
+                <span className="field-label">Homme du match</span>
+                <input
+                  list="motm-names"
+                  onChange={(event) => setManOfTheMatch(event.target.value)}
+                  placeholder="Joueur récompensé"
+                  value={manOfTheMatch}
+                />
+                <datalist id="motm-names">
+                  {motmSuggestions.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
+              </label>
+            </section>
+          ) : null}
+
           <label className="field">
             <span className="field-label">Notes libres & contacts</span>
             <textarea
@@ -212,6 +300,64 @@ const VENUE_HINTS: Record<VenueType, string> = {
   exterieur: "Chez l'adversaire",
   neutre: "Terrain neutre",
 };
+
+function PlayerEntryList({
+  label,
+  placeholder,
+  rows,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  rows: PlayerContribution[];
+  onChange: (rows: PlayerContribution[]) => void;
+}) {
+  function updateRow(index: number, patch: Partial<PlayerContribution>) {
+    onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
+  }
+
+  return (
+    <fieldset className="venue-field">
+      <legend className="field-label">{label}</legend>
+      <div className="player-rows">
+        {rows.map((row, index) => (
+          <div className="player-row" key={`${label}-${index}`}>
+            <input
+              onChange={(event) => updateRow(index, { name: event.target.value })}
+              placeholder={placeholder}
+              value={row.name}
+            />
+            <input
+              aria-label="Nombre"
+              min="1"
+              max="99"
+              onChange={(event) => updateRow(index, { count: Number(event.target.value) || 1 })}
+              type="number"
+              value={row.count}
+            />
+            <button
+              aria-label="Retirer"
+              className="row-remove"
+              onClick={() =>
+                onChange(rows.length > 1 ? rows.filter((_, rowIndex) => rowIndex !== index) : [emptyPlayerRow()])
+              }
+              type="button"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        className="link-btn"
+        onClick={() => onChange([...rows, emptyPlayerRow()])}
+        type="button"
+      >
+        Ajouter un joueur
+      </button>
+    </fieldset>
+  );
+}
 
 function VenueIcon({ type }: { type: VenueType }) {
   if (type === "domicile") {

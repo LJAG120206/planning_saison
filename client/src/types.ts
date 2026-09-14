@@ -8,6 +8,11 @@ export type Category = {
   label: string;
 };
 
+export type PlayerContribution = {
+  name: string;
+  count: number;
+};
+
 export type PlannedEvent = {
   id: number;
   type: EventType;
@@ -16,6 +21,11 @@ export type PlannedEvent = {
   venueDetail: string;
   time: string;
   notes: string;
+  scoreFor: number | null;
+  scoreAgainst: number | null;
+  scorers: PlayerContribution[];
+  assists: PlayerContribution[];
+  manOfTheMatch: string;
 };
 
 export type Sunday = {
@@ -50,6 +60,9 @@ export type SeasonStats = {
   friendlies: number;
   tournaments: number;
   overriddenDays: number;
+  wins: number;
+  draws: number;
+  losses: number;
 };
 
 export type SeasonResponse = {
@@ -79,6 +92,11 @@ export type EventPayload = {
   venueDetail: string;
   time: string;
   notes: string;
+  scoreFor: number | null;
+  scoreAgainst: number | null;
+  scorers: PlayerContribution[];
+  assists: PlayerContribution[];
+  manOfTheMatch: string;
 };
 
 export type CalendarOverridePayload = {

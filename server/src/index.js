@@ -10,9 +10,10 @@ import {
   OFFICIAL_VENUE_TYPES,
   VENUE_TYPES,
   getCategory,
+  isMatchEventType,
 } from "./categories.js";
 import * as db from "./db.js";
-import { buildSunday, isChampionshipCode, normalizeLeagueCode, resolveLeagueState, suggestLeagueCode } from "./season.js";
+import { buildSunday, isChampionshipCode, normalizeLeagueCode, parseOptionalScore, parsePlayerEntries, resolveLeagueState, suggestLeagueCode } from "./season.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT_DIST = path.resolve(__dirname, "..", "..", "client", "dist");
@@ -51,12 +52,21 @@ app.get("/api/season", (req, res) => {
   const sundays = buildSeasonSundays(categoryId);
   const overrideCount = sundays.filter((sunday) => sunday.overridden).length;
 
+  const played = sundays.filter(
+    (sunday) =>
+      sunday.event &&
+      sunday.event.scoreFor != null &&
+      sunday.event.scoreAgainst != null,
+  );
   const stats = {
     officialMatchdays: sundays.filter((sunday) => sunday.official).length,
     freeSlots: sundays.filter((sunday) => !sunday.official && !sunday.event).length,
     friendlies: sundays.filter((sunday) => sunday.event?.type === "amical").length,
     tournaments: sundays.filter((sunday) => sunday.event?.type === "tournoi").length,
     overriddenDays: overrideCount,
+    wins: played.filter((sunday) => sunday.event.scoreFor > sunday.event.scoreAgainst).length,
+    draws: played.filter((sunday) => sunday.event.scoreFor === sunday.event.scoreAgainst).length,
+    losses: played.filter((sunday) => sunday.event.scoreFor < sunday.event.scoreAgainst).length,
   };
 
   const visible = sundays.filter((sunday) => {
@@ -320,6 +330,12 @@ function parseEventPayload(body = {}) {
   const venueDetail = String(body.venueDetail || "").trim();
   const time = String(body.time || "").trim();
   const notes = String(body.notes || "").trim();
+  const matchSheet = isMatchEventType(eventType);
+  const scoreFor = matchSheet ? parseOptionalScore(body.scoreFor) : null;
+  const scoreAgainst = matchSheet ? parseOptionalScore(body.scoreAgainst) : null;
+  const scorers = matchSheet ? parsePlayerEntries(body.scorers) : [];
+  const assists = matchSheet ? parsePlayerEntries(body.assists) : [];
+  const manOfTheMatch = matchSheet ? String(body.manOfTheMatch || "").trim() : "";
 
   if (!getCategory(categoryId)) return { error: "Catégorie inconnue." };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(sundayDate)) return { error: "Date invalide." };
@@ -336,6 +352,13 @@ function parseEventPayload(body = {}) {
     }
   }
 
+  if (scoreFor === undefined || scoreAgainst === undefined) {
+    return { error: "Les scores doivent être des nombres entiers entre 0 et 99." };
+  }
+  if ((scoreFor == null) !== (scoreAgainst == null)) {
+    return { error: "Indiquez les deux scores, ou laissez le résultat vide." };
+  }
+
   return {
     categoryId,
     sundayDate,
@@ -345,5 +368,10 @@ function parseEventPayload(body = {}) {
     venueDetail,
     time,
     notes,
+    scoreFor,
+    scoreAgainst,
+    scorers,
+    assists,
+    manOfTheMatch,
   };
 }

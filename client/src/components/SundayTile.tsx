@@ -1,4 +1,5 @@
-import type { EventType, Sunday, VenueType } from "../types";
+import type { EventType, PlannedEvent, Sunday, VenueType } from "../types";
+import { formatContributions } from "../match";
 
 type Props = {
   sunday: Sunday;
@@ -43,6 +44,7 @@ export default function SundayTile({
                   {officialDetails.venueDetail ? ` · ${officialDetails.venueDetail}` : ""}
                   {officialDetails.time ? ` · ${officialDetails.time}` : ""}
                 </p>
+                <MatchSheetSummary event={officialDetails} />
               </>
             ) : (
               <p className="locked-copy">Journée officielle de championnat. Renseignez l'adversaire et le lieu.</p>
@@ -66,6 +68,7 @@ export default function SundayTile({
                   {sunday.event.venueDetail ? ` · ${sunday.event.venueDetail}` : ""}
                   {sunday.event.time ? ` · ${sunday.event.time}` : ""}
                 </p>
+                <MatchSheetSummary event={sunday.event} />
               </>
             ) : (
               <p className="empty-copy">Aucun événement planifié pour le staff.</p>
@@ -90,5 +93,36 @@ export default function SundayTile({
               : "Ajouter une action"}
       </button>
     </article>
+  );
+}
+
+function MatchSheetSummary({ event }: { event: PlannedEvent }) {
+  const hasScore = event.scoreFor != null && event.scoreAgainst != null;
+  const scorers = formatContributions(event.scorers);
+  const assists = formatContributions(event.assists);
+  if (!hasScore && !scorers && !assists && !event.manOfTheMatch) return null;
+
+  const outcome =
+    hasScore && event.scoreFor != null && event.scoreAgainst != null
+      ? event.scoreFor > event.scoreAgainst
+        ? "win"
+        : event.scoreFor < event.scoreAgainst
+          ? "loss"
+          : "draw"
+      : "";
+
+  return (
+    <>
+      {hasScore ? (
+        <p className={`match-score ${outcome}`}>
+          {event.scoreFor}
+          <span>–</span>
+          {event.scoreAgainst}
+        </p>
+      ) : null}
+      {scorers ? <p className="event-meta">Buts : {scorers}</p> : null}
+      {assists ? <p className="event-meta">Passes : {assists}</p> : null}
+      {event.manOfTheMatch ? <p className="event-meta">Homme du match : {event.manOfTheMatch}</p> : null}
+    </>
   );
 }

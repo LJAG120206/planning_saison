@@ -32,6 +32,12 @@ export const EVENT_TYPES = {
 
 export const OFFICIAL_EVENT_TYPE = "officiel";
 
+export const MATCH_EVENT_TYPES = new Set(["officiel", "amical", "tournoi"]);
+
+export function isMatchEventType(eventType) {
+  return MATCH_EVENT_TYPES.has(eventType);
+}
+
 export const VENUE_TYPES = {
   domicile: "Domicile",
   exterieur: "Extérieur",
