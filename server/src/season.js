@@ -181,6 +181,9 @@ export function mapPlannedEvent(event) {
     manOfTheMatch: event.man_of_the_match || "",
     scorers: parsePlayerEntries(event.scorers_json),
     assists: parsePlayerEntries(event.assists_json),
+    formation: event.formation || "4-4-2",
+    starters: parseNameList(event.lineup_json, 11),
+    substitutes: parseNameList(event.subs_json, 3),
   };
 }
 
@@ -207,4 +210,17 @@ export function parseOptionalScore(value) {
   const score = Number(value);
   if (!Number.isInteger(score) || score < 0 || score > 99) return undefined;
   return score;
+}
+
+export function parseNameList(raw, length) {
+  let names = [];
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw || "[]") : raw;
+    if (Array.isArray(parsed)) {
+      names = parsed.map((name) => String(name || "").trim());
+    }
+  } catch {
+    names = [];
+  }
+  return Array.from({ length }, (_, index) => names[index] || "");
 }

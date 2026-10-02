@@ -10,10 +10,11 @@ import {
   OFFICIAL_VENUE_TYPES,
   VENUE_TYPES,
   getCategory,
+  isFormation,
   isMatchEventType,
 } from "./categories.js";
 import * as db from "./db.js";
-import { buildSunday, isChampionshipCode, normalizeLeagueCode, parseOptionalScore, parsePlayerEntries, resolveLeagueState, suggestLeagueCode } from "./season.js";
+import { buildSunday, isChampionshipCode, normalizeLeagueCode, parseNameList, parseOptionalScore, parsePlayerEntries, resolveLeagueState, suggestLeagueCode } from "./season.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT_DIST = path.resolve(__dirname, "..", "..", "client", "dist");
@@ -336,6 +337,13 @@ function parseEventPayload(body = {}) {
   const scorers = matchSheet ? parsePlayerEntries(body.scorers) : [];
   const assists = matchSheet ? parsePlayerEntries(body.assists) : [];
   const manOfTheMatch = matchSheet ? String(body.manOfTheMatch || "").trim() : "";
+  const formation = matchSheet && isFormation(String(body.formation || ""))
+    ? String(body.formation)
+    : matchSheet
+      ? "4-4-2"
+      : "";
+  const starters = matchSheet ? parseNameList(body.starters, 11) : [];
+  const substitutes = matchSheet ? parseNameList(body.substitutes, 3) : [];
 
   if (!getCategory(categoryId)) return { error: "Catégorie inconnue." };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(sundayDate)) return { error: "Date invalide." };
@@ -373,5 +381,8 @@ function parseEventPayload(body = {}) {
     scorers,
     assists,
     manOfTheMatch,
+    formation,
+    starters,
+    substitutes,
   };
 }

@@ -100,7 +100,8 @@ function MatchSheetSummary({ event }: { event: PlannedEvent }) {
   const hasScore = event.scoreFor != null && event.scoreAgainst != null;
   const scorers = formatContributions(event.scorers);
   const assists = formatContributions(event.assists);
-  if (!hasScore && !scorers && !assists && !event.manOfTheMatch) return null;
+  const namedStarters = event.starters?.filter((name) => name.trim()).length ?? 0;
+  if (!hasScore && !scorers && !assists && !event.manOfTheMatch && !namedStarters) return null;
 
   const outcome =
     hasScore && event.scoreFor != null && event.scoreAgainst != null
@@ -123,6 +124,11 @@ function MatchSheetSummary({ event }: { event: PlannedEvent }) {
       {scorers ? <p className="event-meta">Buts : {scorers}</p> : null}
       {assists ? <p className="event-meta">Passes : {assists}</p> : null}
       {event.manOfTheMatch ? <p className="event-meta">Homme du match : {event.manOfTheMatch}</p> : null}
+      {namedStarters ? (
+        <p className="event-meta">
+          Compo {event.formation} · {namedStarters} titulaire{namedStarters > 1 ? "s" : ""}
+        </p>
+      ) : null}
     </>
   );
 }

@@ -53,6 +53,9 @@ export async function initDb() {
       man_of_the_match TEXT NOT NULL DEFAULT '',
       scorers_json TEXT NOT NULL DEFAULT '[]',
       assists_json TEXT NOT NULL DEFAULT '[]',
+      formation TEXT NOT NULL DEFAULT '4-4-2',
+      lineup_json TEXT NOT NULL DEFAULT '[]',
+      subs_json TEXT NOT NULL DEFAULT '[]',
       UNIQUE(category_id, sunday_date)
     );
     CREATE TABLE IF NOT EXISTS calendar_overrides (
@@ -73,7 +76,7 @@ export async function initDb() {
   return db;
 }
 
-const EVENT_COLUMNS = `id, category_id, sunday_date, event_type, title, venue_type, venue_detail, time, notes, score_for, score_against, man_of_the_match, scorers_json, assists_json`;
+const EVENT_COLUMNS = `id, category_id, sunday_date, event_type, title, venue_type, venue_detail, time, notes, score_for, score_against, man_of_the_match, scorers_json, assists_json, formation, lineup_json, subs_json`;
 
 function ensureEventMatchColumns() {
   const columns = new Set(query("PRAGMA table_info(events)").map((column) => column.name));
@@ -83,6 +86,9 @@ function ensureEventMatchColumns() {
     ["man_of_the_match", "TEXT NOT NULL DEFAULT ''"],
     ["scorers_json", "TEXT NOT NULL DEFAULT '[]'"],
     ["assists_json", "TEXT NOT NULL DEFAULT '[]'"],
+    ["formation", "TEXT NOT NULL DEFAULT '4-4-2'"],
+    ["lineup_json", "TEXT NOT NULL DEFAULT '[]'"],
+    ["subs_json", "TEXT NOT NULL DEFAULT '[]'"],
   ];
   for (const [name, definition] of additions) {
     if (!columns.has(name)) {
@@ -234,8 +240,9 @@ export function insertEvent(payload) {
   run(
     `INSERT INTO events (
        category_id, sunday_date, event_type, title, venue_type, venue_detail, time, notes,
-       score_for, score_against, man_of_the_match, scorers_json, assists_json
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       score_for, score_against, man_of_the_match, scorers_json, assists_json,
+       formation, lineup_json, subs_json
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     eventValues(payload),
   );
   return getEventForDay(payload.categoryId, payload.sundayDate);
@@ -245,7 +252,8 @@ export function updateEvent(id, payload) {
   run(
     `UPDATE events
      SET event_type = ?, title = ?, venue_type = ?, venue_detail = ?, time = ?, notes = ?,
-         score_for = ?, score_against = ?, man_of_the_match = ?, scorers_json = ?, assists_json = ?
+         score_for = ?, score_against = ?, man_of_the_match = ?, scorers_json = ?, assists_json = ?,
+         formation = ?, lineup_json = ?, subs_json = ?
      WHERE id = ?`,
     [
       payload.eventType,
@@ -259,6 +267,9 @@ export function updateEvent(id, payload) {
       payload.manOfTheMatch,
       JSON.stringify(payload.scorers),
       JSON.stringify(payload.assists),
+      payload.formation,
+      JSON.stringify(payload.starters),
+      JSON.stringify(payload.substitutes),
       id,
     ],
   );
@@ -279,6 +290,9 @@ function eventValues(payload) {
     payload.manOfTheMatch,
     JSON.stringify(payload.scorers),
     JSON.stringify(payload.assists),
+    payload.formation,
+    JSON.stringify(payload.starters),
+    JSON.stringify(payload.substitutes),
   ];
 }
 

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { emptyPlayerRow, filledPlayerRows, isMatchEventType } from "../match";
-import type { EventPayload, EventType, PlayerContribution, Sunday, VenueType } from "../types";
+import { emptyPlayerRow, filledPlayerRows, isMatchEventType, namedPlayers, padNames } from "../match";
+import type { EventPayload, EventType, FormationId, PlayerContribution, Sunday, VenueType } from "../types";
+import LineupEditor from "./LineupEditor";
 
 type CoachEventType = Exclude<EventType, "officiel">;
 
@@ -46,14 +47,23 @@ export default function EventModal({
   const [scorers, setScorers] = useState<PlayerContribution[]>(filledPlayerRows(existing?.scorers));
   const [assists, setAssists] = useState<PlayerContribution[]>(filledPlayerRows(existing?.assists));
   const [manOfTheMatch, setManOfTheMatch] = useState(existing?.manOfTheMatch ?? "");
+  const [formation, setFormation] = useState<FormationId>(existing?.formation ?? "4-4-2");
+  const [starters, setStarters] = useState(() => padNames(existing?.starters, 11));
+  const [substitutes, setSubstitutes] = useState(() => padNames(existing?.substitutes, 3));
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const showMatchSheet = official || isMatchEventType(eventType);
   const motmSuggestions = useMemo(() => {
-    const names = [...scorers, ...assists].map((item) => item.name.trim()).filter(Boolean);
+    const names = [
+      ...namedPlayers(starters, substitutes),
+      ...scorers.map((item) => item.name),
+      ...assists.map((item) => item.name),
+    ]
+      .map((name) => name.trim())
+      .filter(Boolean);
     return [...new Set(names)];
-  }, [scorers, assists]);
+  }, [starters, substitutes, scorers, assists]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -82,6 +92,9 @@ export default function EventModal({
         scorers: showMatchSheet ? scorers : [],
         assists: showMatchSheet ? assists : [],
         manOfTheMatch: showMatchSheet ? manOfTheMatch : "",
+        formation: showMatchSheet ? formation : "4-4-2",
+        starters: showMatchSheet ? padNames(starters, 11) : [],
+        substitutes: showMatchSheet ? padNames(substitutes, 3) : [],
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Enregistrement impossible.");
@@ -202,8 +215,21 @@ export default function EventModal({
             <section className="match-sheet">
               <div>
                 <h3>Feuille de match</h3>
-                <p className="field-help">Optionnel, à remplir après le week-end.</p>
+                <p className="field-help">Composition avant le match, résultat après le week-end.</p>
               </div>
+
+              <LineupEditor
+                formation={formation}
+                onFormationChange={setFormation}
+                onStarterChange={(index, name) =>
+                  setStarters((current) => padNames(current, 11).map((value, slot) => (slot === index ? name : value)))
+                }
+                onSubstituteChange={(index, name) =>
+                  setSubstitutes((current) => padNames(current, 3).map((value, slot) => (slot === index ? name : value)))
+                }
+                starters={starters}
+                substitutes={substitutes}
+              />
 
               <div className="score-box">
                 <label className="field">

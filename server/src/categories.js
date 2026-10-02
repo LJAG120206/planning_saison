@@ -34,8 +34,14 @@ export const OFFICIAL_EVENT_TYPE = "officiel";
 
 export const MATCH_EVENT_TYPES = new Set(["officiel", "amical", "tournoi"]);
 
+export const FORMATIONS = ["4-4-2", "3-5-2", "4-2-3-1", "4-3-3", "4-1-4-1", "4-2-4"];
+
 export function isMatchEventType(eventType) {
   return MATCH_EVENT_TYPES.has(eventType);
+}
+
+export function isFormation(value) {
+  return FORMATIONS.includes(value);
 }
 
 export const VENUE_TYPES = {

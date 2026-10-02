@@ -1,6 +1,7 @@
 export type EventType = "amical" | "tournoi" | "stage" | "repos" | "seance" | "officiel";
 export type VenueType = "domicile" | "exterieur" | "neutre";
 export type FilterId = "all" | "available" | "planned";
+export type FormationId = "4-4-2" | "3-5-2" | "4-2-3-1" | "4-3-3" | "4-1-4-1" | "4-2-4";
 
 export type Category = {
   id: string;
@@ -26,6 +27,9 @@ export type PlannedEvent = {
   scorers: PlayerContribution[];
   assists: PlayerContribution[];
   manOfTheMatch: string;
+  formation: FormationId;
+  starters: string[];
+  substitutes: string[];
 };
 
 export type Sunday = {
@@ -97,6 +101,9 @@ export type EventPayload = {
   scorers: PlayerContribution[];
   assists: PlayerContribution[];
   manOfTheMatch: string;
+  formation: FormationId;
+  starters: string[];
+  substitutes: string[];
 };
 
 export type CalendarOverridePayload = {
